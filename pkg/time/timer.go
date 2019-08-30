@@ -22,6 +22,7 @@ type TimerData struct {
 }
 
 // Delay delay duration.
+// 计算t到当前的时间差.返回类型Duration
 func (td *TimerData) Delay() itime.Duration {
 	return itime.Until(td.expire)
 }
@@ -32,6 +33,7 @@ func (td *TimerData) ExpireString() string {
 }
 
 // Timer timer.
+// 时间轮?
 type Timer struct {
 	lock   sync.Mutex
 	free   *TimerData
@@ -65,6 +67,7 @@ func (t *Timer) init(num int) {
 	go t.start()
 }
 
+// 初始化t.free链表
 func (t *Timer) grow() {
 	var (
 		i   int
@@ -81,6 +84,7 @@ func (t *Timer) grow() {
 }
 
 // get get a free timer data.
+// 从t.free里面取出一条数据
 func (t *Timer) get() (td *TimerData) {
 	if td = t.free; td == nil {
 		t.grow()
@@ -91,6 +95,7 @@ func (t *Timer) get() (td *TimerData) {
 }
 
 // put put back a timer data.
+// 往链表的头部插入数据
 func (t *Timer) put(td *TimerData) {
 	td.fn = nil
 	td.next = t.free
@@ -101,7 +106,7 @@ func (t *Timer) put(td *TimerData) {
 // O(log(n)) where n = h.Len().
 func (t *Timer) Add(expire itime.Duration, fn func()) (td *TimerData) {
 	t.lock.Lock()
-	td = t.get()
+	td = t.get()  // 从头部获得timeData，未取出
 	td.expire = itime.Now().Add(expire)
 	td.fn = fn
 	t.add(td)
@@ -113,8 +118,8 @@ func (t *Timer) Add(expire itime.Duration, fn func()) (td *TimerData) {
 // The complexity is O(log(n)) where n = h.Len().
 func (t *Timer) Del(td *TimerData) {
 	t.lock.Lock()
-	t.del(td)
-	t.put(td)
+	t.del(td)  // 从最小堆里面删除元素
+	t.put(td)  // 把删除的元素放回到free中
 	t.lock.Unlock()
 }
 
@@ -124,12 +129,13 @@ func (t *Timer) add(td *TimerData) {
 	var d itime.Duration
 	td.index = len(t.timers)
 	// add to the minheap last node
+	// 插入到最小堆里面
 	t.timers = append(t.timers, td)
-	t.up(td.index)
+	t.up(td.index)  // 调整最小堆
 	if td.index == 0 {
 		// if first node, signal start goroutine
 		d = td.Delay()
-		t.signal.Reset(d)
+		t.signal.Reset(d)  // 刷新，重置定时器
 		if Debug {
 			log.Infof("timer: add reset delay %d ms", int64(d)/int64(itime.Millisecond))
 		}
@@ -167,16 +173,16 @@ func (t *Timer) del(td *TimerData) {
 // Set update timer data.
 func (t *Timer) Set(td *TimerData, expire itime.Duration) {
 	t.lock.Lock()
-	t.del(td)
+	t.del(td)  // 先删除该节点
 	td.expire = itime.Now().Add(expire)
-	t.add(td)
+	t.add(td)  // 然后再重新插入该节点
 	t.lock.Unlock()
 }
 
 // start start the timer.
 func (t *Timer) start() {
 	for {
-		t.expire()
+		t.expire()  // 定时触发所有定时事件
 		<-t.signal.C
 	}
 }

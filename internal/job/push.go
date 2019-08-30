@@ -87,6 +87,7 @@ func (j *Job) broadcastRoomRawBytes(roomID string, body []byte) (err error) {
 		},
 	}
 	comets := j.cometServers
+	// 每个server都会发一遍房间的信息
 	for serverID, c := range comets {
 		if err = c.BroadcastRoom(&args); err != nil {
 			log.Errorf("c.BroadcastRoom(%v) roomID:%s serverID:%s error(%v)", args, roomID, serverID, err)

@@ -8,7 +8,18 @@ import (
 	log "github.com/golang/glog"
 )
 
+// goim发送消息也是群聊一对多消息，会往kafka投递多条消息
+
+/*
+1.keys维度
+2.mids维度
+3.room维度
+4.broadcast
+ */
+
 // PushKeys push a message by keys.
+// 往keys列表发表消息
+// key-server指的是每个用户对应每个server
 func (l *Logic) PushKeys(c context.Context, op int32, keys []string, msg []byte) (err error) {
 	servers, err := l.dao.ServersByKeys(c, keys)
 	if err != nil {
@@ -21,6 +32,7 @@ func (l *Logic) PushKeys(c context.Context, op int32, keys []string, msg []byte)
 			pushKeys[server] = append(pushKeys[server], key)
 		}
 	}
+	// 逐个key发布
 	for server := range pushKeys {
 		if err = l.dao.PushMsg(c, op, server, pushKeys[server], msg); err != nil {
 			return
@@ -30,6 +42,7 @@ func (l *Logic) PushKeys(c context.Context, op int32, keys []string, msg []byte)
 }
 
 // PushMids push a message by mid.
+// 按照mid维度发送消息
 func (l *Logic) PushMids(c context.Context, op int32, mids []int64, msg []byte) (err error) {
 	keyServers, _, err := l.dao.KeysByMids(c, mids)
 	if err != nil {
@@ -52,11 +65,13 @@ func (l *Logic) PushMids(c context.Context, op int32, mids []int64, msg []byte) 
 }
 
 // PushRoom push a message by room.
+// 房间维度推送消息
 func (l *Logic) PushRoom(c context.Context, op int32, typ, room string, msg []byte) (err error) {
 	return l.dao.BroadcastRoomMsg(c, op, model.EncodeRoomKey(typ, room), msg)
 }
 
 // PushAll push a message to all.
+// 广播推送消息
 func (l *Logic) PushAll(c context.Context, op, speed int32, msg []byte) (err error) {
 	return l.dao.BroadcastMsg(c, op, speed, msg)
 }

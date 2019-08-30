@@ -30,6 +30,7 @@ const (
 func newLogicClient(c *conf.RPCClient) logic.LogicClient {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.Dial))
 	defer cancel()
+	// 初始化connect
 	conn, err := grpc.DialContext(ctx, "discovery://default/goim.logic",
 		[]grpc.DialOption{
 			grpc.WithInsecure(),
@@ -70,6 +71,7 @@ func NewServer(c *conf.Config) *Server {
 		rpcClient: newLogicClient(c.RPCClient),
 	}
 	// init bucket
+	// 默认初始化32个Bucket
 	s.buckets = make([]*Bucket, c.Bucket.Size)
 	s.bucketIdx = uint32(c.Bucket.Size)
 	for i := 0; i < c.Bucket.Size; i++ {
@@ -87,6 +89,7 @@ func (s *Server) Buckets() []*Bucket {
 
 // Bucket get the bucket by subkey.
 func (s *Server) Bucket(subKey string) *Bucket {
+	// 利用cityhash算法计算出下标
 	idx := cityhash.CityHash32([]byte(subKey), uint32(len(subKey))) % s.bucketIdx
 	if conf.Conf.Debug {
 		log.Infof("%s hit channel bucket index: %d use cityhash", subKey, idx)
@@ -95,6 +98,7 @@ func (s *Server) Bucket(subKey string) *Bucket {
 }
 
 // RandServerHearbeat rand server heartbeat.
+// 随机心跳上报的时间间隔
 func (s *Server) RandServerHearbeat() time.Duration {
 	return (minServerHeartbeat + time.Duration(rand.Int63n(int64(maxServerHeartbeat-minServerHeartbeat))))
 }
@@ -113,7 +117,7 @@ func (s *Server) onlineproc() {
 		roomCount := make(map[string]int32)
 		for _, bucket := range s.buckets {
 			for roomID, count := range bucket.RoomsCount() {
-				roomCount[roomID] += count
+				roomCount[roomID] += count  // 计算每个Bucket的房间总人数
 			}
 		}
 		if allRoomsCount, err = s.RenewOnline(context.Background(), s.serverID, roomCount); err != nil {

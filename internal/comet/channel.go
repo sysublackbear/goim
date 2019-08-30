@@ -27,7 +27,7 @@ type Channel struct {
 // NewChannel new a channel.
 func NewChannel(cli, svr int) *Channel {
 	c := new(Channel)
-	c.CliProto.Init(cli)
+	c.CliProto.Init(cli)  // 初始化环形数据
 	c.signal = make(chan *grpc.Proto, svr)
 	c.watchOps = make(map[int32]struct{})
 	return c
@@ -36,6 +36,7 @@ func NewChannel(cli, svr int) *Channel {
 // Watch watch a operation.
 func (c *Channel) Watch(accepts ...int32) {
 	c.mutex.Lock()
+	// 监听注册
 	for _, op := range accepts {
 		c.watchOps[op] = struct{}{}
 	}
@@ -54,6 +55,7 @@ func (c *Channel) UnWatch(accepts ...int32) {
 // NeedPush verify if in watch.
 func (c *Channel) NeedPush(op int32) bool {
 	c.mutex.RLock()
+	// 检查op是否存在
 	if _, ok := c.watchOps[op]; ok {
 		c.mutex.RUnlock()
 		return true
@@ -64,7 +66,12 @@ func (c *Channel) NeedPush(op int32) bool {
 
 // Push server push message.
 func (c *Channel) Push(p *grpc.Proto) (err error) {
+	// select-case-default与下面直接往通道写入的差异是：
+	// 直接往通道写入，如果channel满了，会一直阻塞在那里;
+	// 而select-case-default，会在准备好的case中随机选择一个执行，如果都没有准备好，会走到default分支
+	// 在这里体现为消息丢了
 	select {
+	// 推送消息
 	case c.signal <- p:
 	default:
 	}

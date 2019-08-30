@@ -167,6 +167,8 @@ func (s *Server) ServeWebsocket(conn net.Conn, rp, wp *bytes.Pool, tr *xtime.Tim
 		req     *websocket.Request
 	)
 	// reader
+	// 这里把conn和bufio.Reader的关系绑定在一起
+	// rb.Bytes——8k的buffer
 	ch.Reader.ResetBuffer(conn, rb.Bytes())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -184,16 +186,17 @@ func (s *Server) ServeWebsocket(conn net.Conn, rp, wp *bytes.Pool, tr *xtime.Tim
 	if req, err = websocket.ReadRequest(rr); err != nil || req.RequestURI != "/sub" {
 		conn.Close()
 		tr.Del(trd)
-		rp.Put(rb)
+		rp.Put(rb)  // 回收空间
 		if err != io.EOF {
 			log.Errorf("http.ReadRequest(rr) error(%v)", err)
 		}
 		return
 	}
 	// writer
-	wb := wp.Get()
+	wb := wp.Get()  // 从对象池找找出对象
 	ch.Writer.ResetBuffer(conn, wb.Bytes())
 	step = 2
+	// websocket连接返回
 	if ws, err = websocket.Upgrade(conn, rr, wr, req); err != nil {
 		conn.Close()
 		tr.Del(trd)
@@ -209,8 +212,9 @@ func (s *Server) ServeWebsocket(conn net.Conn, rp, wp *bytes.Pool, tr *xtime.Tim
 	if p, err = ch.CliProto.Set(); err == nil {
 		if ch.Mid, ch.Key, rid, accepts, hb, err = s.authWebsocket(ctx, ws, p, req.Header.Get("Cookie")); err == nil {
 			ch.Watch(accepts...)
+			// 认证成功，计算出这个链接需要放到哪个bucket里面
 			b = s.Bucket(ch.Key)
-			err = b.Put(rid, ch)
+			err = b.Put(rid, ch)  // 把channel放到对应的roomid里面，相当于一个连接维护一个channel
 			if conf.Conf.Debug {
 				log.Infof("websocket connnected key:%s mid:%d proto:%+v", ch.Key, ch.Mid, p)
 			}
@@ -223,20 +227,21 @@ func (s *Server) ServeWebsocket(conn net.Conn, rp, wp *bytes.Pool, tr *xtime.Tim
 		wp.Put(wb)
 		tr.Del(trd)
 		if err != io.EOF && err != websocket.ErrMessageClose {
+			// 握手失败
 			log.Errorf("key: %s remoteIP: %s step: %d ws handshake failed error(%v)", ch.Key, conn.RemoteAddr().String(), step, err)
 		}
 		return
 	}
 	trd.Key = ch.Key
 	tr.Set(trd, hb)
-	white = whitelist.Contains(ch.Mid)
+	white = whitelist.Contains(ch.Mid)  // 判断mid是否在白名单中
 	if white {
 		whitelist.Printf("key: %s[%s] auth\n", ch.Key, rid)
 	}
 	// hanshake ok start dispatch goroutine
 	step = 5
 	go s.dispatchWebsocket(ws, wp, wb, ch)
-	serverHeartbeat := s.RandServerHearbeat()
+	serverHeartbeat := s.RandServerHearbeat()  // 心跳上报的时间间隔
 	for {
 		if p, err = ch.CliProto.Set(); err != nil {
 			break
@@ -251,10 +256,12 @@ func (s *Server) ServeWebsocket(conn net.Conn, rp, wp *bytes.Pool, tr *xtime.Tim
 			whitelist.Printf("key: %s read proto:%v\n", ch.Key, p)
 		}
 		if p.Op == grpc.OpHeartbeat {
-			tr.Set(trd, hb)
+			// 接收客户端发来的心跳信息
+			tr.Set(trd, hb)  // 重置心跳
 			p.Op = grpc.OpHeartbeatReply
 			p.Body = nil
 			// NOTE: send server heartbeat for a long time
+			// 太长时间没有心跳反馈了，向后台发一次心跳的rpc调用
 			if now := time.Now(); now.Sub(lastHB) > serverHeartbeat {
 				if err1 := s.Heartbeat(ctx, ch.Mid, ch.Key); err1 == nil {
 					lastHB = now
@@ -317,6 +324,7 @@ func (s *Server) dispatchWebsocket(ws *websocket.Conn, wp *bytes.Pool, wb *bytes
 		if white {
 			whitelist.Printf("key: %s wait proto ready\n", ch.Key)
 		}
+		// 从返回管道取出消息
 		var p = ch.Ready()
 		if white {
 			whitelist.Printf("key: %s proto ready\n", ch.Key)
@@ -324,6 +332,7 @@ func (s *Server) dispatchWebsocket(ws *websocket.Conn, wp *bytes.Pool, wb *bytes
 		if conf.Conf.Debug {
 			log.Infof("key:%s dispatch msg:%s", ch.Key, p.Body)
 		}
+		// 从Channel中取出信息，进行分类判断
 		switch p {
 		case grpc.ProtoFinish:
 			if white {
@@ -351,6 +360,7 @@ func (s *Server) dispatchWebsocket(ws *websocket.Conn, wp *bytes.Pool, wb *bytes
 						goto failed
 					}
 				} else {
+					// 回包给client端
 					if err = p.WriteWebsocket(ws); err != nil {
 						goto failed
 					}
@@ -397,7 +407,7 @@ failed:
 	wp.Put(wb)
 	// must ensure all channel message discard, for reader won't blocking Signal
 	for !finish {
-		finish = (ch.Ready() == grpc.ProtoFinish)
+		finish = ch.Ready() == grpc.ProtoFinish
 	}
 	if conf.Conf.Debug {
 		log.Infof("key: %s dispatch goroutine exit", ch.Key)
@@ -416,6 +426,7 @@ func (s *Server) authWebsocket(ctx context.Context, ws *websocket.Conn, p *grpc.
 			log.Errorf("ws request operation(%d) not auth", p.Op)
 		}
 	}
+	// 调用后台grpc接口-Connect
 	if mid, key, rid, accepts, hb, err = s.Connect(ctx, p, cookie); err != nil {
 		return
 	}

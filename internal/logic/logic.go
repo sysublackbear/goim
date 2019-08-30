@@ -41,8 +41,8 @@ func New(c *conf.Config) (l *Logic) {
 		loadBalancer: NewLoadBalancer(),
 		regions:      make(map[string]string),
 	}
-	l.initRegions()
-	l.initNodes()
+	l.initRegions()  // 初始化l.regions
+	l.initNodes()    // 注册节点
 	_ = l.loadOnline()
 	go l.onlineproc()
 	return l
@@ -50,7 +50,7 @@ func New(c *conf.Config) (l *Logic) {
 
 // Ping ping resources is ok.
 func (l *Logic) Ping(c context.Context) (err error) {
-	return l.dao.Ping(c)
+	return l.dao.Ping(c)   // 由Logic去ping redis
 }
 
 // Close close resources.
@@ -132,6 +132,8 @@ func (l *Logic) newNodes(res naming.Resolver) {
 func (l *Logic) onlineproc() {
 	for {
 		time.Sleep(_onlineTick)
+		// 每隔10s更新在线人数
+		// 从redis里面取出人数统计信息
 		if err := l.loadOnline(); err != nil {
 			log.Errorf("onlineproc error(%v)", err)
 		}
@@ -144,10 +146,12 @@ func (l *Logic) loadOnline() (err error) {
 	)
 	for _, server := range l.nodes {
 		var online *model.Online
+		// 从redis中获取在线人数
 		online, err = l.dao.ServerOnline(context.Background(), server.Hostname)
 		if err != nil {
 			return
 		}
+		// 长时间没有心跳，直接删除该key
 		if time.Since(time.Unix(online.Updated, 0)) > _onlineDeadline {
 			_ = l.dao.DelServerOnline(context.Background(), server.Hostname)
 			continue

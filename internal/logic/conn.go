@@ -20,6 +20,7 @@ func (l *Logic) Connect(c context.Context, server, cookie string, token []byte) 
 		Platform string  `json:"platform"`
 		Accepts  []int32 `json:"accepts"`
 	}
+	// 客户端组织: var token = '{"mid":123, "room_id":"live://1000", "platform":"web", "accepts":[1000,1001,1002]}'
 	if err = json.Unmarshal(token, &params); err != nil {
 		log.Errorf("json.Unmarshal(%s) error(%v)", token, err)
 		return
@@ -31,6 +32,9 @@ func (l *Logic) Connect(c context.Context, server, cookie string, token []byte) 
 	if key = params.Key; key == "" {
 		key = uuid.New().String()
 	}
+	// 把这个映射写到redis里面
+	// HSET mid {key: server}
+	// SET key server
 	if err = l.dao.AddMapping(c, mid, key, server); err != nil {
 		log.Errorf("l.dao.AddMapping(%d,%s,%s) error(%v)", mid, key, server, err)
 	}
@@ -40,6 +44,7 @@ func (l *Logic) Connect(c context.Context, server, cookie string, token []byte) 
 
 // Disconnect disconnect a conn.
 func (l *Logic) Disconnect(c context.Context, mid int64, key, server string) (has bool, err error) {
+	// 从mapping里面删除
 	if has, err = l.dao.DelMapping(c, mid, key, server); err != nil {
 		log.Errorf("l.dao.DelMapping(%d,%s) error(%v)", mid, key, server)
 		return
@@ -50,12 +55,14 @@ func (l *Logic) Disconnect(c context.Context, mid int64, key, server string) (ha
 
 // Heartbeat heartbeat a conn.
 func (l *Logic) Heartbeat(c context.Context, mid int64, key, server string) (err error) {
+	// 如果key存在，直接进行续期就可以
 	has, err := l.dao.ExpireMapping(c, mid, key)
 	if err != nil {
 		log.Errorf("l.dao.ExpireMapping(%d,%s,%s) error(%v)", mid, key, server, err)
 		return
 	}
 	if !has {
+		// 如果key不存在，重新添加该key
 		if err = l.dao.AddMapping(c, mid, key, server); err != nil {
 			log.Errorf("l.dao.AddMapping(%d,%s,%s) error(%v)", mid, key, server, err)
 			return

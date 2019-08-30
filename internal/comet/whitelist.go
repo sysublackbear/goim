@@ -33,6 +33,7 @@ func InitWhitelist(c *conf.Whitelist) (err error) {
 }
 
 // Contains whitelist contains a mid or not.
+// 判断mid是否存在于Whitelist中，即：whitelist.list[mid] = struct{}{}
 func (w *Whitelist) Contains(mid int64) (ok bool) {
 	if mid > 0 {
 		_, ok = w.list[mid]

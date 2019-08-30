@@ -31,13 +31,14 @@ func NewRoom(id string) (r *Room) {
 func (r *Room) Put(ch *Channel) (err error) {
 	r.rLock.Lock()
 	if !r.drop {
+		// 往Room.next链表中插入channel
 		if r.next != nil {
 			r.next.Prev = ch
 		}
 		ch.Next = r.next
 		ch.Prev = nil
-		r.next = ch // insert to header
-		r.Online++
+		r.next = ch // insert to header，往头部添加
+		r.Online++  // 在线人数+1
 	} else {
 		err = errors.ErrRoomDroped
 	}
@@ -65,8 +66,10 @@ func (r *Room) Del(ch *Channel) bool {
 }
 
 // Push push msg to the room, if chan full discard it.
+// 把消息推送到房间里面，如果channel满了，则丢弃它
 func (r *Room) Push(p *grpc.Proto) {
 	r.rLock.RLock()
+	// 消息发到一个房间就需要把消息发到一个房间的所有频道里面
 	for ch := r.next; ch != nil; ch = ch.Next {
 		_ = ch.Push(p)
 	}
@@ -85,7 +88,7 @@ func (r *Room) Close() {
 // OnlineNum the room all online.
 func (r *Room) OnlineNum() int32 {
 	if r.AllOnline > 0 {
-		return r.AllOnline
+		return r.AllOnline  // AllOnline开关
 	}
 	return r.Online
 }

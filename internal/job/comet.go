@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bilibili/discovery/naming"
 	comet "github.com/Terry-Mao/goim/api/comet/grpc"
 	"github.com/Terry-Mao/goim/internal/job/conf"
+	"github.com/bilibili/discovery/naming"
 
 	log "github.com/golang/glog"
 	"google.golang.org/grpc"
@@ -113,7 +113,7 @@ func (c *Comet) Push(arg *comet.PushMsgReq) (err error) {
 // BroadcastRoom broadcast a room message.
 func (c *Comet) BroadcastRoom(arg *comet.BroadcastRoomReq) (err error) {
 	idx := atomic.AddUint64(&c.roomChanNum, 1) % c.routineSize
-	c.roomChan[idx] <- arg
+	c.roomChan[idx] <- arg  // 塞到对应的管道里面
 	return
 }
 
@@ -159,6 +159,7 @@ func (c *Comet) process(pushChan chan *comet.PushMsgReq, roomChan chan *comet.Br
 }
 
 // Close close the resouces.
+// 等到消息投递完才关闭
 func (c *Comet) Close() (err error) {
 	finish := make(chan bool)
 	go func() {

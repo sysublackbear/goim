@@ -48,6 +48,7 @@ func (b *Bucket) RoomCount() int {
 }
 
 // RoomsCount get all room id where online number > 0.
+// 计算每个房间的在线人数
 func (b *Bucket) RoomsCount() (res map[string]int32) {
 	var (
 		roomID string
@@ -88,7 +89,7 @@ func (b *Bucket) ChangeRoom(nrid string, ch *Channel) (err error) {
 	if oroom != nil && oroom.Del(ch) {
 		b.DelRoom(oroom)
 	}
-	
+	// 把ch放入新建的Room对象中
 	if err = nroom.Put(ch); err != nil {
 		return
 	}
@@ -104,6 +105,7 @@ func (b *Bucket) Put(rid string, ch *Channel) (err error) {
 	)
 	b.cLock.Lock()
 	// close old channel
+	// 关闭老的channel
 	if dch := b.chs[ch.Key]; dch != nil {
 		dch.Close()
 	}
@@ -115,10 +117,11 @@ func (b *Bucket) Put(rid string, ch *Channel) (err error) {
 		}
 		ch.Room = room
 	}
-	b.ipCnts[ch.IP]++
+	b.ipCnts[ch.IP]++  // 同个IP接入了多少个房间
 	b.cLock.Unlock()
 	if room != nil {
-		err = room.Put(ch)
+		// 一个房间里面有多少个连接
+		err = room.Put(ch)  // 把channel放入到Room对象里面
 	}
 	return
 }
@@ -140,7 +143,7 @@ func (b *Bucket) Del(dch *Channel) {
 		if b.ipCnts[ch.IP] > 1 {
 			b.ipCnts[ch.IP]--
 		} else {
-			delete(b.ipCnts, ch.IP)
+			delete(b.ipCnts, ch.IP)  // 整个key去掉
 		}
 	}
 	b.cLock.Unlock()
@@ -151,6 +154,7 @@ func (b *Bucket) Del(dch *Channel) {
 }
 
 // Channel get a channel by sub key.
+// 同个key去查找channel
 func (b *Bucket) Channel(key string) (ch *Channel) {
 	b.cLock.RLock()
 	ch = b.chs[key]
@@ -162,6 +166,7 @@ func (b *Bucket) Channel(key string) (ch *Channel) {
 func (b *Bucket) Broadcast(p *grpc.Proto, op int32) {
 	var ch *Channel
 	b.cLock.RLock()
+	// 遍历所有的Channel
 	for _, ch = range b.chs {
 		if !ch.NeedPush(op) {
 			continue
@@ -189,11 +194,13 @@ func (b *Bucket) DelRoom(room *Room) {
 
 // BroadcastRoom broadcast a message to specified room
 func (b *Bucket) BroadcastRoom(arg *grpc.BroadcastRoomReq) {
+	// 随机选择一个协程
 	num := atomic.AddUint64(&b.routinesNum, 1) % b.c.RoutineAmount
 	b.routines[num] <- arg
 }
 
 // Rooms get all room id where online number > 0.
+// 获取所有有在线人数的房间
 func (b *Bucket) Rooms() (res map[string]struct{}) {
 	var (
 		roomID string
@@ -232,7 +239,7 @@ func (b *Bucket) UpRoomsCount(roomCountMap map[string]int32) {
 	)
 	b.cLock.RLock()
 	for roomID, room = range b.rooms {
-		room.AllOnline = roomCountMap[roomID]
+		room.AllOnline = roomCountMap[roomID]  // 更新AllOnline,每个bucket都更新
 	}
 	b.cLock.RUnlock()
 }
@@ -240,9 +247,9 @@ func (b *Bucket) UpRoomsCount(roomCountMap map[string]int32) {
 // roomproc
 func (b *Bucket) roomproc(c chan *grpc.BroadcastRoomReq) {
 	for {
-		arg := <-c
+		arg := <-c  // 从channel读出数据
 		if room := b.Room(arg.RoomID); room != nil {
-			room.Push(arg.Proto)
+			room.Push(arg.Proto)  // 找出对应房间，进行发送
 		}
 	}
 }

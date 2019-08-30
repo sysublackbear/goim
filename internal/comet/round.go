@@ -43,7 +43,7 @@ func NewRound(c *conf.Config) (r *Round) {
 	// reader
 	r.readers = make([]bytes.Pool, r.options.Reader)
 	for i = 0; i < r.options.Reader; i++ {
-		r.readers[i].Init(r.options.ReadBuf, r.options.ReadBufSize)
+		r.readers[i].Init(r.options.ReadBuf, r.options.ReadBufSize)   // 初始化32个Reader对象池
 	}
 	// writer
 	r.writers = make([]bytes.Pool, r.options.Writer)
@@ -60,7 +60,7 @@ func NewRound(c *conf.Config) (r *Round) {
 
 // Timer get a timer.
 func (r *Round) Timer(rn int) *time.Timer {
-	return &(r.timers[rn%r.options.Timer])
+	return &(r.timers[rn%r.options.Timer])  // 默认32个bucket
 }
 
 // Reader get a reader memory buffer.

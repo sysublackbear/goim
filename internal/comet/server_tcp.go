@@ -59,10 +59,12 @@ func acceptTCP(server *Server, lis *net.TCPListener) {
 			log.Errorf("listener.Accept(\"%s\") error(%v)", lis.Addr().String(), err)
 			return
 		}
+		// 保持KeepAlive
 		if err = conn.SetKeepAlive(server.c.TCP.KeepAlive); err != nil {
 			log.Errorf("conn.SetKeepAlive() error(%v)", err)
 			return
 		}
+		// 设置readBuffer和writeBuffer的大小
 		if err = conn.SetReadBuffer(server.c.TCP.Rcvbuf); err != nil {
 			log.Errorf("conn.SetReadBuffer() error(%v)", err)
 			return
@@ -71,7 +73,7 @@ func acceptTCP(server *Server, lis *net.TCPListener) {
 			log.Errorf("conn.SetWriteBuffer() error(%v)", err)
 			return
 		}
-		go serveTCP(server, conn, r)
+		go serveTCP(server, conn, r)  // r作为一个计数器
 		if r++; r == maxInt {
 			r = 0
 		}

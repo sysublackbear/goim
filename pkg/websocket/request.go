@@ -30,9 +30,11 @@ func ReadRequest(r *bufio.Reader) (req *Request, err error) {
 	if b, err = req.readLine(); err != nil {
 		return
 	}
+	// 握手动作
 	if req.Method, req.RequestURI, req.Proto, ok = parseRequestLine(string(b)); !ok {
 		return nil, fmt.Errorf("malformed HTTP request %s", b)
 	}
+	// 获取http header参数
 	if req.Header, err = req.readMIMEHeader(); err != nil {
 		return
 	}
@@ -48,6 +50,7 @@ func (r *Request) readLine() ([]byte, error) {
 			return nil, err
 		}
 		// Avoid the copy if the first call produced a full line.
+		// 直接返回一次l，减少拷贝
 		if line == nil && !more {
 			return l, nil
 		}

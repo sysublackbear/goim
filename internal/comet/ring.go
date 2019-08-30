@@ -22,7 +22,7 @@ type Ring struct {
 
 // NewRing new a ring buffer.
 func NewRing(num int) *Ring {
-	r := new(Ring)
+	r := new(Ring)  // 两段式初始化
 	r.init(uint64(num))
 	return r
 }
@@ -32,6 +32,7 @@ func (r *Ring) Init(num int) {
 	r.init(uint64(num))
 }
 
+// 求出最小的N，使得2^N >= num
 func (r *Ring) init(num uint64) {
 	// 2^N
 	if num&(num-1) != 0 {
@@ -48,15 +49,15 @@ func (r *Ring) init(num uint64) {
 // Get get a proto from ring.
 func (r *Ring) Get() (proto *grpc.Proto, err error) {
 	if r.rp == r.wp {
-		return nil, errors.ErrRingEmpty
+		return nil, errors.ErrRingEmpty  // 环形数据为空
 	}
-	proto = &r.data[r.rp&r.mask]
+	proto = &r.data[r.rp&r.mask]  // 找出那一个包
 	return
 }
 
 // GetAdv incr read index.
 func (r *Ring) GetAdv() {
-	r.rp++
+	r.rp++  // 底层rp，打印debug log，显示出现在读到哪个位置
 	if conf.Conf.Debug {
 		log.Infof("ring rp: %d, idx: %d", r.rp, r.rp&r.mask)
 	}
@@ -64,7 +65,7 @@ func (r *Ring) GetAdv() {
 
 // Set get a proto to write.
 func (r *Ring) Set() (proto *grpc.Proto, err error) {
-	if r.wp-r.rp >= r.num {
+	if r.wp-r.rp >= r.num {  // 已经写满了
 		return nil, errors.ErrRingFull
 	}
 	proto = &r.data[r.wp&r.mask]

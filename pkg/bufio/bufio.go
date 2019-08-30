@@ -47,14 +47,16 @@ const maxConsecutiveEmptyReads = 100
 func NewReaderSize(rd io.Reader, size int) *Reader {
 	// Is it already a Reader?
 	b, ok := rd.(*Reader)
+	// buffer已经充足
 	if ok && len(b.buf) >= size {
 		return b
 	}
+	// 必须大于16字节
 	if size < minReadBufferSize {
 		size = minReadBufferSize
 	}
 	r := new(Reader)
-	r.reset(make([]byte, size), rd)
+	r.reset(make([]byte, size), rd)  // 分配空间
 	return r
 }
 
@@ -87,7 +89,7 @@ var errNegativeRead = errors.New("bufio: reader returned negative count from Rea
 // fill reads a new chunk into the buffer.
 func (b *Reader) fill() {
 	// Slide existing data to beginning.
-	if b.r > 0 {
+	if b.r > 0 {  // 重置已经读的部分
 		copy(b.buf, b.buf[b.r:b.w])
 		b.w -= b.r
 		b.r = 0
@@ -99,7 +101,7 @@ func (b *Reader) fill() {
 
 	// Read new data: try a limited number of times.
 	for i := maxConsecutiveEmptyReads; i > 0; i-- {
-		n, err := b.rd.Read(b.buf[b.w:])
+		n, err := b.rd.Read(b.buf[b.w:])  // 读满buffer
 		if n < 0 {
 			panic(errNegativeRead)
 		}
@@ -108,7 +110,7 @@ func (b *Reader) fill() {
 			b.err = err
 			return
 		}
-		if n > 0 {
+		if n > 0 {  // 有读到数据，可以返回
 			return
 		}
 	}
@@ -133,6 +135,7 @@ func (b *Reader) Peek(n int) ([]byte, error) {
 		return nil, ErrBufferFull
 	}
 	// 0 <= n <= len(b.buf)
+	// 读够为止
 	for b.w-b.r < n && b.err == nil {
 		b.fill() // b.w-b.r < len(b.buf) => buffer is not full
 	}
@@ -218,14 +221,14 @@ func (b *Reader) Read(p []byte) (n int, err error) {
 			}
 			return n, b.readErr()
 		}
-		b.fill() // buffer is empty
+		b.fill() // buffer is empty，填充buffer
 		if b.r == b.w {
 			return 0, b.readErr()
 		}
 	}
 
 	// copy as much as we can
-	n = copy(p, b.buf[b.r:b.w])
+	n = copy(p, b.buf[b.r:b.w])  // 进行buffer拷贝
 	b.r += n
 	return n, nil
 }
@@ -256,6 +259,7 @@ func (b *Reader) ReadByte() (c byte, err error) {
 // by the next I/O operation, most clients should use
 // ReadBytes or ReadString instead.
 // ReadSlice returns err != nil if and only if line does not end in delim.
+// 从输入中读取，直到遇到第一个界定符（delim）为止，返回一个指向缓存中字节的slice，在下次调用读操作（read）时，这些字节会无效。
 func (b *Reader) ReadSlice(delim byte) (line []byte, err error) {
 	for {
 		// Search buffer.
@@ -303,7 +307,7 @@ func (b *Reader) ReadSlice(delim byte) (line []byte, err error) {
 // (possibly a character belonging to the line end) even if that byte is not
 // part of the line returned by ReadLine.
 func (b *Reader) ReadLine() (line []byte, isPrefix bool, err error) {
-	line, err = b.ReadSlice('\n')
+	line, err = b.ReadSlice('\n')  // 读到\n就停止
 	if err == ErrBufferFull {
 		// Handle the case where "\r\n" straddles the buffer.
 		if len(line) > 0 && line[len(line)-1] == '\r' {

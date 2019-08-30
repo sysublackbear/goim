@@ -14,13 +14,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bilibili/discovery/naming"
-	resolver "github.com/bilibili/discovery/naming/grpc"
 	"github.com/Terry-Mao/goim/internal/comet"
 	"github.com/Terry-Mao/goim/internal/comet/conf"
 	"github.com/Terry-Mao/goim/internal/comet/grpc"
 	md "github.com/Terry-Mao/goim/internal/logic/model"
 	"github.com/Terry-Mao/goim/pkg/ip"
+	"github.com/bilibili/discovery/naming"
+	resolver "github.com/bilibili/discovery/naming/grpc"
 	log "github.com/golang/glog"
 )
 
@@ -43,12 +43,15 @@ func main() {
 	resolver.Register(dis)
 	// new comet server
 	srv := comet.NewServer(conf.Conf)
+	// 初始化白名单
 	if err := comet.InitWhitelist(conf.Conf.Whitelist); err != nil {
 		panic(err)
 	}
+	// 监听tcp端口并且accept tcp连接
 	if err := comet.InitTCP(srv, conf.Conf.TCP.Bind, runtime.NumCPU()); err != nil {
 		panic(err)
 	}
+	// 初始化websocket
 	if err := comet.InitWebsocket(srv, conf.Conf.Websocket.Bind, runtime.NumCPU()); err != nil {
 		panic(err)
 	}

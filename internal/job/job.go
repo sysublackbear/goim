@@ -32,6 +32,7 @@ func New(c *conf.Config) *Job {
 		consumer: newKafkaSub(c.Kafka),
 		rooms:    make(map[string]*Room),
 	}
+	// 监听comet实例，有新实例加入到本地缓存
 	j.watchComet(c.Discovery)
 	return j
 }

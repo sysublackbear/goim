@@ -42,6 +42,7 @@ func NewRoom(job *Job, id string, c *conf.Room) (r *Room) {
 }
 
 // Push push msg to the room, if chan full discard it.
+// 推送消息到房间，如果channel满了则进行丢弃
 func (r *Room) Push(op int32, msg []byte) (err error) {
 	var p = &comet.Proto{
 		Ver:  1,
@@ -57,6 +58,8 @@ func (r *Room) Push(op int32, msg []byte) (err error) {
 }
 
 // pushproc merge proto and push msgs in batch.
+// default: sigTime: 1s
+// 由这个函数统一每sigTime收集一次
 func (r *Room) pushproc(batch int, sigTime time.Duration) {
 	var (
 		n    int
@@ -103,16 +106,19 @@ func (r *Room) pushproc(batch int, sigTime time.Duration) {
 			td.Reset(time.Minute)
 		}
 	}
+	// sigTime没有收到消息，就会主动断开这个房间的链接
 	r.job.delRoom(r.id)
 	log.Infof("room:%s goroutine exit", r.id)
 }
 
+// 删除房间
 func (j *Job) delRoom(roomID string) {
 	j.roomsMutex.Lock()
 	delete(j.rooms, roomID)
 	j.roomsMutex.Unlock()
 }
 
+// 查询房间信息，不存在则创建
 func (j *Job) getRoom(roomID string) *Room {
 	j.roomsMutex.RLock()
 	room, ok := j.rooms[roomID]

@@ -41,8 +41,8 @@ func (d *Dao) pingRedis(c context.Context) (err error) {
 
 // AddMapping add a mapping.
 // Mapping:
-//	mid -> key_server
-//	key -> server
+//	mid -> key_server  mid到key_server的映射
+//	key -> server  key到server的映射
 func (d *Dao) AddMapping(c context.Context, mid int64, key, server string) (err error) {
 	conn := d.redis.Get()
 	defer conn.Close()
@@ -233,7 +233,7 @@ func (d *Dao) addServerOnline(c context.Context, key string, hashKey string, onl
 // ServerOnline get a server online.
 func (d *Dao) ServerOnline(c context.Context, server string) (online *model.Online, err error) {
 	online = &model.Online{RoomCount: map[string]int32{}}
-	key := keyServerOnline(server)
+	key := keyServerOnline(server)  // 每个host映射成redis的一个key
 	for i := 0; i < 64; i++ {
 		ol, err := d.serverOnline(c, key, strconv.FormatInt(int64(i), 10))
 		if err == nil && ol != nil {

@@ -65,6 +65,7 @@ func (s *Server) Receive(ctx context.Context, mid int64, p *model.Proto) (err er
 }
 
 // Operate operate.
+// b已经在auth成功有了值，b = s.Bucket(ch.Key)
 func (s *Server) Operate(ctx context.Context, p *model.Proto, ch *Channel, b *Bucket) error {
 	switch p.Op {
 	case model.OpChangeRoom:

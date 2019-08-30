@@ -24,6 +24,7 @@ var (
 
 // Upgrade Switching Protocols
 func Upgrade(rwc io.ReadWriteCloser, rr *bufio.Reader, wr *bufio.Writer, req *Request) (conn *Conn, err error) {
+	// 参数检查
 	if req.Method != "GET" {
 		return nil, ErrBadRequestMethod
 	}
@@ -40,6 +41,7 @@ func Upgrade(rwc io.ReadWriteCloser, rr *bufio.Reader, wr *bufio.Writer, req *Re
 	if challengeKey == "" {
 		return nil, ErrChallengeResponse
 	}
+	// 返回建立websocket成功的响应
 	_, _ = wr.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n")
 	_, _ = wr.WriteString("Sec-WebSocket-Accept: " + computeAcceptKey(challengeKey) + "\r\n\r\n")
 	if err = wr.Flush(); err != nil {
